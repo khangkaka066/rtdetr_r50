@@ -12,6 +12,12 @@ Train with AMP:
 python tools/train.py -c configs/rtdetr/rtdetr_r50vd_6x_coco.yml --amp
 ```
 
+Override epochs without editing YAML:
+
+```bash
+python tools/train.py -c configs/rtdetr/rtdetr_r50vd_6x_mot17.yml --epochs 12
+```
+
 Resume:
 
 ```bash

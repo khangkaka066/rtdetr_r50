@@ -61,15 +61,19 @@ python tools/prepare_mot17_dataset.py /new/path/to/MOT17/train --force
 python tools/train.py \
   -c configs/rtdetr/rtdetr_r50vd_6x_mot17.yml \
   -t https://github.com/lyuwenyu/storage/releases/download/v0.1/rtdetr_r50vd_6x_coco_from_paddle.pth \
-  --amp
+  --amp \
+  --epochs 24
 ```
 
 Or prepare and train in one command:
 
 ```bash
 bash tools/train_mot17_from_path.sh \
-  /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train
+  /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train \
+  --epochs 24
 ```
+
+Change `24` to any number you want. For a quick test, use `--epochs 1` or `--epochs 3`.
 
 The first command writes:
 

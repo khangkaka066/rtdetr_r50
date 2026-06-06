@@ -21,11 +21,16 @@ def main(args, ) -> None:
     assert not all([args.tuning, args.resume]), \
         'Only support from_scrach or resume or tuning at one time'
 
+    overrides = {}
+    if args.epochs is not None:
+        overrides['epoches'] = args.epochs
+
     cfg = YAMLConfig(
         args.config,
-        resume=args.resume, 
+        resume=args.resume,
         use_amp=args.amp,
-        tuning=args.tuning
+        tuning=args.tuning,
+        **overrides
     )
 
     solver = TASKS[cfg.yaml_cfg['task']](cfg)
@@ -44,6 +49,8 @@ if __name__ == '__main__':
     parser.add_argument('--tuning', '-t', type=str, )
     parser.add_argument('--test-only', action='store_true', default=False,)
     parser.add_argument('--amp', action='store_true', default=False,)
+    parser.add_argument('--epochs', '--epoches', dest='epochs', type=int,
+                        help='override total training epochs from the config')
     parser.add_argument('--seed', type=int, help='seed',)
     args = parser.parse_args()
 

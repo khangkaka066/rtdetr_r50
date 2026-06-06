@@ -61,7 +61,8 @@ Fine-tune from the official COCO checkpoint:
 python tools/train.py \
   -c configs/rtdetr/rtdetr_r50vd_6x_mot17.yml \
   -t https://github.com/lyuwenyu/storage/releases/download/v0.1/rtdetr_r50vd_6x_coco_from_paddle.pth \
-  --amp
+  --amp \
+  --epochs 24
 ```
 
 Without AMP:
@@ -70,6 +71,16 @@ Without AMP:
 python tools/train.py \
   -c configs/rtdetr/rtdetr_r50vd_6x_mot17.yml \
   -t https://github.com/lyuwenyu/storage/releases/download/v0.1/rtdetr_r50vd_6x_coco_from_paddle.pth
+```
+
+You can override the epoch count without editing YAML:
+
+```bash
+python tools/train.py \
+  -c configs/rtdetr/rtdetr_r50vd_6x_mot17.yml \
+  -t https://github.com/lyuwenyu/storage/releases/download/v0.1/rtdetr_r50vd_6x_coco_from_paddle.pth \
+  --amp \
+  --epochs 12
 ```
 
 ## 4. Evaluate
