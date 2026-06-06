@@ -42,6 +42,8 @@ def main(args, ) -> None:
     overrides = {}
     if args.epochs is not None:
         overrides['epoches'] = args.epochs
+    if args.eval_interval is not None:
+        overrides['eval_interval'] = args.eval_interval
 
     cfg = YAMLConfig(
         args.config,
@@ -71,6 +73,8 @@ if __name__ == '__main__':
                         help='override total training epochs from the config')
     parser.add_argument('--mot-root', type=str,
                         help='real MOT17 train directory; prepares dataset/mot17/raw and COCO JSON before training')
+    parser.add_argument('--eval-interval', type=int,
+                        help='run validation every N epochs; 0 disables validation except final epoch')
     parser.add_argument('--seed', type=int, help='seed',)
     args = parser.parse_args()
 

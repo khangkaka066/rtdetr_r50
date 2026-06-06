@@ -18,6 +18,12 @@ Override epochs without editing YAML:
 python tools/train.py -c configs/rtdetr/rtdetr_r50vd_6x_mot17.yml --epochs 12
 ```
 
+Run validation less often to speed up training:
+
+```bash
+python tools/train.py -c configs/rtdetr/rtdetr_r50vd_6x_mot17.yml --epochs 12 --eval-interval 3
+```
+
 Resume:
 
 ```bash

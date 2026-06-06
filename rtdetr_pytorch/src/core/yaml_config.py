@@ -35,6 +35,7 @@ class YAMLConfig(BaseConfig):
         self.autocast = cfg.get('autocast', dict())
         self.find_unused_parameters = cfg.get('find_unused_parameters', None)
         self.clip_max_norm = cfg.get('clip_max_norm', 0.)
+        self.eval_interval = cfg.get('eval_interval', 1)
 
 
     @property

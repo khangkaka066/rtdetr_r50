@@ -51,12 +51,23 @@ class DetSolver(BaseSolver):
                 for checkpoint_path in checkpoint_paths:
                     dist.save_on_master(self.state_dict(epoch), checkpoint_path)
 
-            module = self.ema.module if self.ema else self.model
-            eval_start_time = time.time()
-            test_stats, coco_evaluator = evaluate(
-                module, self.criterion, self.postprocessor, self.val_dataloader, base_ds, self.device, self.output_dir
-            )
-            eval_time = time.time() - eval_start_time
+            eval_interval = getattr(args, 'eval_interval', 1)
+            should_eval = epoch == args.epoches - 1
+            if eval_interval and eval_interval > 0:
+                should_eval = should_eval or (epoch + 1) % eval_interval == 0
+
+            test_stats = {}
+            coco_evaluator = None
+            eval_time = 0.
+            if should_eval:
+                module = self.ema.module if self.ema else self.model
+                eval_start_time = time.time()
+                test_stats, coco_evaluator = evaluate(
+                    module, self.criterion, self.postprocessor, self.val_dataloader, base_ds, self.device, self.output_dir
+                )
+                eval_time = time.time() - eval_start_time
+            else:
+                print(f'Skip evaluation at epoch {epoch} (eval_interval={eval_interval})')
 
             # TODO 
             for k in test_stats.keys():

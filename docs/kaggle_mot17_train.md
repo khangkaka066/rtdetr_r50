@@ -63,10 +63,12 @@ python tools/train.py \
   -t https://github.com/lyuwenyu/storage/releases/download/v0.1/rtdetr_r50vd_6x_coco_from_paddle.pth \
   --mot-root /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train \
   --amp \
-  --epochs 24
+  --epochs 24 \
+  --eval-interval 3
 ```
 
 `--mot-root` prepares the virtual path and COCO JSON automatically, so you do not need a separate prepare cell.
+`--eval-interval 3` runs validation every 3 epochs and on the final epoch. Use `--eval-interval 1` for validation every epoch.
 
 Or prepare and train in one command:
 
