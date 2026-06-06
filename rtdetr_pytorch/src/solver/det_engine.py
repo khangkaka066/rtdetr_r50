@@ -15,7 +15,19 @@ import torch
 import torch.amp 
 
 from src.data import CocoEvaluator
+import src.misc.dist as dist
 from src.misc import (MetricLogger, SmoothedValue, reduce_dict)
+
+try:
+    from tqdm.auto import tqdm
+except ImportError:
+    tqdm = None
+
+
+def make_progress(iterable, desc):
+    if tqdm is None or not dist.is_main_process():
+        return iterable
+    return tqdm(iterable, total=len(iterable), desc=desc, dynamic_ncols=True, leave=True)
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -32,7 +44,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     ema = kwargs.get('ema', None)
     scaler = kwargs.get('scaler', None)
 
-    for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
+    progress = make_progress(data_loader, header)
+    for samples, targets in progress:
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
@@ -82,6 +95,12 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         metric_logger.update(loss=loss_value, **loss_dict_reduced)
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
 
+        if hasattr(progress, 'set_postfix'):
+            progress.set_postfix(
+                loss=f'{loss_value:.4f}',
+                lr=f'{optimizer.param_groups[0]["lr"]:.2e}',
+                refresh=False)
+
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
@@ -111,7 +130,8 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
     #         output_dir=os.path.join(output_dir, "panoptic_eval"),
     #     )
 
-    for samples, targets in metric_logger.log_every(data_loader, 10, header):
+    progress = make_progress(data_loader, header)
+    for samples, targets in progress:
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
@@ -144,6 +164,9 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
         res = {target['image_id'].item(): output for target, output in zip(targets, results)}
         if coco_evaluator is not None:
             coco_evaluator.update(res)
+
+        if hasattr(progress, 'set_postfix'):
+            progress.set_postfix(batch=len(targets), refresh=False)
 
         # if panoptic_evaluator is not None:
         #     res_pano = postprocessors["panoptic"](outputs, target_sizes, orig_target_sizes)
@@ -185,6 +208,5 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
     #     stats['PQ_st'] = panoptic_res["Stuff"]
 
     return stats, coco_evaluator
-
 
 

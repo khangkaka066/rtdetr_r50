@@ -3,4 +3,5 @@ onnxruntime
 pycocotools
 PyYAML
 scipy
+tqdm
 transformers
