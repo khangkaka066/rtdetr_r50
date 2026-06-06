@@ -31,12 +31,15 @@ class DetSolver(BaseSolver):
 
         start_time = time.time()
         for epoch in range(self.last_epoch + 1, args.epoches):
+            epoch_start_time = time.time()
             if dist.is_dist_available_and_initialized():
                 self.train_dataloader.sampler.set_epoch(epoch)
             
+            train_start_time = time.time()
             train_stats = train_one_epoch(
                 self.model, self.criterion, self.train_dataloader, self.optimizer, self.device, epoch,
                 args.clip_max_norm, print_freq=args.log_step, ema=self.ema, scaler=self.scaler)
+            train_time = time.time() - train_start_time
 
             self.lr_scheduler.step()
             
@@ -49,9 +52,11 @@ class DetSolver(BaseSolver):
                     dist.save_on_master(self.state_dict(epoch), checkpoint_path)
 
             module = self.ema.module if self.ema else self.model
+            eval_start_time = time.time()
             test_stats, coco_evaluator = evaluate(
                 module, self.criterion, self.postprocessor, self.val_dataloader, base_ds, self.device, self.output_dir
             )
+            eval_time = time.time() - eval_start_time
 
             # TODO 
             for k in test_stats.keys():
@@ -63,10 +68,21 @@ class DetSolver(BaseSolver):
                     best_stat[k] = test_stats[k][0]
             print('best_stat: ', best_stat)
 
+            epoch_time = time.time() - epoch_start_time
+            epoch_time_str = str(datetime.timedelta(seconds=int(epoch_time)))
+            train_time_str = str(datetime.timedelta(seconds=int(train_time)))
+            eval_time_str = str(datetime.timedelta(seconds=int(eval_time)))
+            print(
+                f'Epoch {epoch} time: {epoch_time_str} '
+                f'(train: {train_time_str}, eval: {eval_time_str})'
+            )
 
             log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
                         **{f'test_{k}': v for k, v in test_stats.items()},
                         'epoch': epoch,
+                        'epoch_time': epoch_time,
+                        'train_time': train_time,
+                        'eval_time': eval_time,
                         'n_parameters': n_parameters}
 
             if self.output_dir and dist.is_main_process():
