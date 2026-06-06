@@ -19,7 +19,7 @@ import src.misc.dist as dist
 from src.misc import (MetricLogger, SmoothedValue, reduce_dict)
 
 try:
-    from tqdm.auto import tqdm
+    from tqdm import tqdm
 except ImportError:
     tqdm = None
 
@@ -27,7 +27,16 @@ except ImportError:
 def make_progress(iterable, desc):
     if tqdm is None or not dist.is_main_process():
         return iterable
-    return tqdm(iterable, total=len(iterable), desc=desc, dynamic_ncols=True, leave=True)
+    return tqdm(
+        iterable,
+        total=len(iterable),
+        desc=desc,
+        file=sys.stdout,
+        dynamic_ncols=True,
+        leave=True,
+        mininterval=1.0,
+        ascii=True,
+    )
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -45,7 +54,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     scaler = kwargs.get('scaler', None)
 
     progress = make_progress(data_loader, header)
-    for samples, targets in progress:
+    for step, (samples, targets) in enumerate(progress):
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
@@ -99,7 +108,12 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             progress.set_postfix(
                 loss=f'{loss_value:.4f}',
                 lr=f'{optimizer.param_groups[0]["lr"]:.2e}',
-                refresh=False)
+                refresh=True)
+        elif dist.is_main_process() and (step % print_freq == 0 or step == len(data_loader) - 1):
+            print(
+                f'{header} [{step + 1}/{len(data_loader)}] '
+                f'loss={loss_value:.4f} lr={optimizer.param_groups[0]["lr"]:.2e}',
+                flush=True)
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -131,7 +145,7 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
     #     )
 
     progress = make_progress(data_loader, header)
-    for samples, targets in progress:
+    for step, (samples, targets) in enumerate(progress):
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
@@ -166,7 +180,9 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
             coco_evaluator.update(res)
 
         if hasattr(progress, 'set_postfix'):
-            progress.set_postfix(batch=len(targets), refresh=False)
+            progress.set_postfix(batch=len(targets), refresh=True)
+        elif dist.is_main_process() and (step % 20 == 0 or step == len(data_loader) - 1):
+            print(f'{header} [{step + 1}/{len(data_loader)}]', flush=True)
 
         # if panoptic_evaluator is not None:
         #     res_pano = postprocessors["panoptic"](outputs, target_sizes, orig_target_sizes)
@@ -208,5 +224,4 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
     #     stats['PQ_st'] = panoptic_res["Stuff"]
 
     return stats, coco_evaluator
-
 
