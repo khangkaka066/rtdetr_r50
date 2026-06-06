@@ -9,6 +9,8 @@ import math
 import os
 import sys
 import pathlib
+import time
+import datetime
 from typing import Iterable
 
 import torch
@@ -18,25 +20,23 @@ from src.data import CocoEvaluator
 import src.misc.dist as dist
 from src.misc import (MetricLogger, SmoothedValue, reduce_dict)
 
-try:
-    from tqdm import tqdm
-except ImportError:
-    tqdm = None
 
+def print_progress(desc, step, total, start_time, info='', width=30):
+    if not dist.is_main_process():
+        return
 
-def make_progress(iterable, desc):
-    if tqdm is None or not dist.is_main_process():
-        return iterable
-    return tqdm(
-        iterable,
-        total=len(iterable),
-        desc=desc,
-        file=sys.stdout,
-        dynamic_ncols=True,
-        leave=True,
-        mininterval=1.0,
-        ascii=True,
-    )
+    done = step + 1
+    ratio = done / max(total, 1)
+    filled = int(width * ratio)
+    bar = '#' * filled + '-' * (width - filled)
+    elapsed = time.time() - start_time
+    eta = elapsed / max(done, 1) * max(total - done, 0)
+    elapsed_str = str(datetime.timedelta(seconds=int(elapsed)))
+    eta_str = str(datetime.timedelta(seconds=int(eta)))
+    print(
+        f'{desc} [{bar}] {done}/{total} '
+        f'{ratio * 100:5.1f}% elapsed={elapsed_str} eta={eta_str} {info}',
+        flush=True)
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -53,8 +53,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     ema = kwargs.get('ema', None)
     scaler = kwargs.get('scaler', None)
 
-    progress = make_progress(data_loader, header)
-    for step, (samples, targets) in enumerate(progress):
+    progress_start = time.time()
+    progress_freq = max(1, min(print_freq, 10))
+    for step, (samples, targets) in enumerate(data_loader):
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
@@ -104,16 +105,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         metric_logger.update(loss=loss_value, **loss_dict_reduced)
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
 
-        if hasattr(progress, 'set_postfix'):
-            progress.set_postfix(
-                loss=f'{loss_value:.4f}',
-                lr=f'{optimizer.param_groups[0]["lr"]:.2e}',
-                refresh=True)
-        elif dist.is_main_process() and (step % print_freq == 0 or step == len(data_loader) - 1):
-            print(
-                f'{header} [{step + 1}/{len(data_loader)}] '
-                f'loss={loss_value:.4f} lr={optimizer.param_groups[0]["lr"]:.2e}',
-                flush=True)
+        if step % progress_freq == 0 or step == len(data_loader) - 1:
+            print_progress(
+                header,
+                step,
+                len(data_loader),
+                progress_start,
+                info=f'loss={loss_value:.4f} lr={optimizer.param_groups[0]["lr"]:.2e}')
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -144,8 +142,9 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
     #         output_dir=os.path.join(output_dir, "panoptic_eval"),
     #     )
 
-    progress = make_progress(data_loader, header)
-    for step, (samples, targets) in enumerate(progress):
+    progress_start = time.time()
+    progress_freq = 10
+    for step, (samples, targets) in enumerate(data_loader):
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
@@ -179,10 +178,13 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
         if coco_evaluator is not None:
             coco_evaluator.update(res)
 
-        if hasattr(progress, 'set_postfix'):
-            progress.set_postfix(batch=len(targets), refresh=True)
-        elif dist.is_main_process() and (step % 20 == 0 or step == len(data_loader) - 1):
-            print(f'{header} [{step + 1}/{len(data_loader)}]', flush=True)
+        if step % progress_freq == 0 or step == len(data_loader) - 1:
+            print_progress(
+                header,
+                step,
+                len(data_loader),
+                progress_start,
+                info=f'batch={len(targets)}')
 
         # if panoptic_evaluator is not None:
         #     res_pano = postprocessors["panoptic"](outputs, target_sizes, orig_target_sizes)
@@ -224,4 +226,3 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
     #     stats['PQ_st'] = panoptic_res["Stuff"]
 
     return stats, coco_evaluator
-

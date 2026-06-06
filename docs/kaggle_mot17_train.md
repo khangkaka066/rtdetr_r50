@@ -75,7 +75,13 @@ bash tools/train_mot17_from_path.sh \
 
 Change `24` to any number you want. For a quick test, use `--epochs 1` or `--epochs 3`.
 
-Training and evaluation show `tqdm` progress bars in the notebook. During train, the bar displays current `loss` and `lr`; after each epoch, the code prints total epoch time.
+Training and evaluation print a text progress bar in the notebook, for example:
+
+```text
+Epoch: [0] [######------------------------] 120/665  18.0% elapsed=0:02:10 eta=0:09:48 loss=3.4210 lr=1.00e-05
+```
+
+During train, the bar displays current `loss` and `lr`; after each epoch, the code prints total epoch time.
 
 The first command writes:
 
