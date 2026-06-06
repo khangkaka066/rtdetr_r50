@@ -14,6 +14,14 @@ kaggle datasets download -d wenhoujinjust/mot-17 -p dataset/mot17/raw --unzip
 
 If Kaggle extracts another nested folder, keep `dataset/mot17/raw` as the root that contains folders like `MOT17-02-FRCNN` or `train/MOT17-02-FRCNN`.
 
+If `git clone` says `destination path 'rtdetr_r50' already exists`, the repo is already cloned. Use:
+
+```bash
+cd /kaggle/working/rtdetr_r50
+git pull
+cd rtdetr_pytorch
+```
+
 If you already added the Kaggle dataset as an input and it is mounted at `/kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train`, use the prepare script instead of downloading:
 
 ```bash

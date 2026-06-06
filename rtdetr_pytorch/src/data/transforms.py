@@ -6,8 +6,6 @@ import torch
 import torch.nn as nn 
 
 import torchvision
-torchvision.disable_beta_transforms_warning()
-from torchvision import datapoints
 
 import torchvision.transforms.v2 as T
 import torchvision.transforms.v2.functional as F
@@ -16,6 +14,15 @@ from PIL import Image
 from typing import Any, Dict, List, Optional
 
 from src.core import register, GLOBAL_CONFIG
+from .tv_compat import (
+    BOUNDING_BOX_FORMAT,
+    BOUNDING_BOX_TYPE,
+    IMAGE_TYPE,
+    MASK_TYPE,
+    VIDEO_TYPE,
+    get_spatial_size,
+    make_bounding_box,
+)
 
 
 __all__ = ['Compose', ]
@@ -26,11 +33,32 @@ RandomZoomOut = register(T.RandomZoomOut)
 # RandomIoUCrop = register(T.RandomIoUCrop)
 RandomHorizontalFlip = register(T.RandomHorizontalFlip)
 Resize = register(T.Resize)
-ToImageTensor = register(T.ToImageTensor)
-ConvertDtype = register(T.ConvertDtype)
-SanitizeBoundingBox = register(T.SanitizeBoundingBox)
 RandomCrop = register(T.RandomCrop)
 Normalize = register(T.Normalize)
+
+if hasattr(T, "ToImageTensor"):
+    ToImageTensor = register(T.ToImageTensor)
+else:
+    @register
+    class ToImageTensor(T.ToImage):
+        pass
+
+
+if hasattr(T, "ConvertDtype"):
+    ConvertDtype = register(T.ConvertDtype)
+else:
+    @register
+    class ConvertDtype(T.ToDtype):
+        def __init__(self, dtype=torch.float32, scale=True):
+            super().__init__(dtype=dtype, scale=scale)
+
+
+if hasattr(T, "SanitizeBoundingBox"):
+    SanitizeBoundingBox = register(T.SanitizeBoundingBox)
+else:
+    @register
+    class SanitizeBoundingBox(T.SanitizeBoundingBoxes):
+        pass
 
 
 
@@ -70,10 +98,10 @@ class EmptyTransform(T.Transform):
 class PadToSize(T.Pad):
     _transformed_types = (
         Image.Image,
-        datapoints.Image,
-        datapoints.Video,
-        datapoints.Mask,
-        datapoints.BoundingBox,
+        IMAGE_TYPE,
+        VIDEO_TYPE,
+        MASK_TYPE,
+        BOUNDING_BOX_TYPE,
     )
     def _get_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
         sz = F.get_spatial_size(flat_inputs[0])
@@ -122,7 +150,7 @@ class RandomIoUCrop(T.RandomIoUCrop):
 @register
 class ConvertBox(T.Transform):
     _transformed_types = (
-        datapoints.BoundingBox,
+        BOUNDING_BOX_TYPE,
     )
     def __init__(self, out_fmt='', normalize=False) -> None:
         super().__init__()
@@ -130,19 +158,20 @@ class ConvertBox(T.Transform):
         self.normalize = normalize
 
         self.data_fmt = {
-            'xyxy': datapoints.BoundingBoxFormat.XYXY,
-            'cxcywh': datapoints.BoundingBoxFormat.CXCYWH
+            'xyxy': BOUNDING_BOX_FORMAT.XYXY,
+            'cxcywh': BOUNDING_BOX_FORMAT.CXCYWH
         }
 
     def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:  
         if self.out_fmt:
-            spatial_size = inpt.spatial_size
+            spatial_size = get_spatial_size(inpt)
             in_fmt = inpt.format.value.lower()
             inpt = torchvision.ops.box_convert(inpt, in_fmt=in_fmt, out_fmt=self.out_fmt)
-            inpt = datapoints.BoundingBox(inpt, format=self.data_fmt[self.out_fmt], spatial_size=spatial_size)
+            inpt = make_bounding_box(inpt, format=self.data_fmt[self.out_fmt], spatial_size=spatial_size)
         
         if self.normalize:
-            inpt = inpt / torch.tensor(inpt.spatial_size[::-1]).tile(2)[None]
+            spatial_size = get_spatial_size(inpt)
+            inpt = inpt / torch.tensor(spatial_size[::-1]).tile(2)[None]
 
         return inpt
 

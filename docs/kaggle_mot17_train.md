@@ -12,25 +12,26 @@ Only the `train` split has `gt/gt.txt`, so it is the split used for fine-tuning.
 ## 1. Clone
 
 ```bash
-git clone https://github.com/khangkaka066/rtdetr_r50.git
+cd /kaggle/working
+
+if [ ! -d rtdetr_r50 ]; then
+  git clone https://github.com/khangkaka066/rtdetr_r50.git
+else
+  cd rtdetr_r50
+  git pull
+  cd ..
+fi
+
 cd rtdetr_r50/rtdetr_pytorch
 ```
 
 ## 2. Install
 
-Kaggle usually already has PyTorch. Install only the missing packages first:
+Kaggle already has PyTorch. Install the repo requirements; this repo no longer pins old torch versions:
 
 ```bash
-pip install pycocotools scipy PyYAML onnx onnxruntime
+pip install -r requirements.txt
 ```
-
-If `torchvision.datapoints` is missing, install the repo-pinned versions:
-
-```bash
-pip install torch==2.0.1 torchvision==0.15.2 --extra-index-url https://download.pytorch.org/whl/cu118
-```
-
-Restart the Kaggle notebook kernel after changing torch/torchvision.
 
 ## 3. One-command Path Setup
 

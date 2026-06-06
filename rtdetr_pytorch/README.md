@@ -20,6 +20,8 @@ https://github.com/lyuwenyu/storage/releases/download/v0.1/rtdetr_r50vd_6x_coco_
 pip install -r requirements.txt
 ```
 
+Kaggle already ships PyTorch. The requirements file intentionally does not pin `torch` or `torchvision`, so it works with newer Kaggle Python environments where `torch==2.0.1` is unavailable.
+
 ## Data
 
 Download COCO 2017 train and val images:
