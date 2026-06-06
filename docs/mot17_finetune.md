@@ -14,12 +14,13 @@ kaggle datasets download -d wenhoujinjust/mot-17 -p dataset/mot17/raw --unzip
 
 If Kaggle extracts another nested folder, keep `dataset/mot17/raw` as the root that contains folders like `MOT17-02-FRCNN` or `train/MOT17-02-FRCNN`.
 
-If you already added the Kaggle dataset as an input and it is mounted at `/kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train`, use a symlink instead of downloading:
+If you already added the Kaggle dataset as an input and it is mounted at `/kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train`, use the prepare script instead of downloading:
 
 ```bash
 cd /kaggle/working/rtdetr_r50/rtdetr_pytorch
-mkdir -p dataset/mot17
-ln -s /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train dataset/mot17/raw
+python tools/prepare_mot17_dataset.py \
+  /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train \
+  --force
 ```
 
 See `kaggle_mot17_train.md` for the Kaggle-specific workflow.

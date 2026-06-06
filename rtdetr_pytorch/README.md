@@ -94,13 +94,7 @@ Use COCO-format annotations, set `remap_mscoco_category: False` in `configs/data
 MOT17 needs to be converted from MOT `gt.txt` annotations to COCO detection JSON before training.
 
 ```bash
-kaggle datasets download -d wenhoujinjust/mot-17 -p dataset/mot17/raw --unzip
-
-python tools/convert_mot17_to_coco.py \
-  --mot-root dataset/mot17/raw \
-  --out-dir dataset/mot17/annotations \
-  --detector-variant FRCNN \
-  --split half
+python tools/prepare_mot17_dataset.py /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train --force
 
 python tools/train.py \
   -c configs/rtdetr/rtdetr_r50vd_6x_mot17.yml \

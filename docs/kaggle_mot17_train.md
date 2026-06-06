@@ -32,54 +32,49 @@ pip install torch==2.0.1 torchvision==0.15.2 --extra-index-url https://download.
 
 Restart the Kaggle notebook kernel after changing torch/torchvision.
 
-## 3. Link Kaggle Input
+## 3. One-command Path Setup
 
-The config expects images under `dataset/mot17/raw`, so create a symlink:
-
-```bash
-mkdir -p dataset/mot17
-ln -s /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train dataset/mot17/raw
-```
-
-Check:
-
-```bash
-find dataset/mot17/raw -maxdepth 2 -type d | head
-```
-
-You should see folders like:
+The repo uses a stable virtual dataset path:
 
 ```text
-dataset/mot17/raw/MOT17-02-FRCNN
-dataset/mot17/raw/MOT17-04-FRCNN
+dataset/mot17/raw
 ```
 
-## 4. Convert MOT17 to COCO
+You only need to provide the real dataset path once. The script creates the symlink and converts MOT17 annotations to COCO:
 
 ```bash
-python tools/convert_mot17_to_coco.py \
-  --mot-root dataset/mot17/raw \
-  --out-dir dataset/mot17/annotations \
-  --detector-variant FRCNN \
-  --split half \
-  --include-classes 1 \
-  --min-visibility 0.1
+python tools/prepare_mot17_dataset.py \
+  /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train \
+  --force
 ```
 
-This writes:
+If the dataset path changes later, run the same command with the new path:
 
-```text
-dataset/mot17/annotations/train.json
-dataset/mot17/annotations/val.json
+```bash
+python tools/prepare_mot17_dataset.py /new/path/to/MOT17/train --force
 ```
 
-## 5. Train on T4
+## 4. Train on T4
 
 ```bash
 python tools/train.py \
   -c configs/rtdetr/rtdetr_r50vd_6x_mot17.yml \
   -t https://github.com/lyuwenyu/storage/releases/download/v0.1/rtdetr_r50vd_6x_coco_from_paddle.pth \
   --amp
+```
+
+Or prepare and train in one command:
+
+```bash
+bash tools/train_mot17_from_path.sh \
+  /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train
+```
+
+The first command writes:
+
+```text
+dataset/mot17/annotations/train.json
+dataset/mot17/annotations/val.json
 ```
 
 For Kaggle T4 memory, if you hit OOM, lower batch size in:
@@ -90,7 +85,7 @@ configs/dataset/mot17_detection.yml
 
 Change both train and val `batch_size` from `4` to `2`.
 
-## 6. Save Outputs
+## 5. Save Outputs
 
 Kaggle working files are saved under:
 
