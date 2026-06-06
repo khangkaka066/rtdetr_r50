@@ -5,15 +5,33 @@ import os
 import sys 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import argparse
+import subprocess
 
 import src.misc.dist as dist 
 from src.core import YAMLConfig 
 from src.solver import TASKS
 
 
+def prepare_mot17_if_needed(args):
+    if not args.mot_root:
+        return
+
+    cmd = [
+        sys.executable,
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prepare_mot17_dataset.py'),
+        args.mot_root,
+        '--force',
+    ]
+    print('Preparing MOT17 dataset:')
+    print(' '.join(cmd))
+    subprocess.run(cmd, check=True)
+
+
 def main(args, ) -> None:
     '''main
     '''
+    prepare_mot17_if_needed(args)
+
     dist.init_distributed()
     if args.seed is not None:
         dist.set_seed(args.seed)
@@ -51,6 +69,8 @@ if __name__ == '__main__':
     parser.add_argument('--amp', action='store_true', default=False,)
     parser.add_argument('--epochs', '--epoches', dest='epochs', type=int,
                         help='override total training epochs from the config')
+    parser.add_argument('--mot-root', type=str,
+                        help='real MOT17 train directory; prepares dataset/mot17/raw and COCO JSON before training')
     parser.add_argument('--seed', type=int, help='seed',)
     args = parser.parse_args()
 

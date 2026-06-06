@@ -61,9 +61,12 @@ python tools/prepare_mot17_dataset.py /new/path/to/MOT17/train --force
 python tools/train.py \
   -c configs/rtdetr/rtdetr_r50vd_6x_mot17.yml \
   -t https://github.com/lyuwenyu/storage/releases/download/v0.1/rtdetr_r50vd_6x_coco_from_paddle.pth \
+  --mot-root /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train \
   --amp \
   --epochs 24
 ```
+
+`--mot-root` prepares the virtual path and COCO JSON automatically, so you do not need a separate prepare cell.
 
 Or prepare and train in one command:
 

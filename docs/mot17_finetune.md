@@ -61,6 +61,7 @@ Fine-tune from the official COCO checkpoint:
 python tools/train.py \
   -c configs/rtdetr/rtdetr_r50vd_6x_mot17.yml \
   -t https://github.com/lyuwenyu/storage/releases/download/v0.1/rtdetr_r50vd_6x_coco_from_paddle.pth \
+  --mot-root /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train \
   --amp \
   --epochs 24
 ```
@@ -79,6 +80,7 @@ You can override the epoch count without editing YAML:
 python tools/train.py \
   -c configs/rtdetr/rtdetr_r50vd_6x_mot17.yml \
   -t https://github.com/lyuwenyu/storage/releases/download/v0.1/rtdetr_r50vd_6x_coco_from_paddle.pth \
+  --mot-root /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train \
   --amp \
   --epochs 12
 ```
