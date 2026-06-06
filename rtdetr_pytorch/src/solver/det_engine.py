@@ -33,10 +33,13 @@ def print_progress(desc, step, total, start_time, info='', width=30):
     eta = elapsed / max(done, 1) * max(total - done, 0)
     elapsed_str = str(datetime.timedelta(seconds=int(elapsed)))
     eta_str = str(datetime.timedelta(seconds=int(eta)))
-    print(
+    line = (
         f'{desc} [{bar}] {done}/{total} '
-        f'{ratio * 100:5.1f}% elapsed={elapsed_str} eta={eta_str} {info}',
-        flush=True)
+        f'{ratio * 100:5.1f}% elapsed={elapsed_str} eta={eta_str} {info}'
+    )
+    end = '\n' if done >= total else ''
+    sys.stdout.write('\r' + line.ljust(160) + end)
+    sys.stdout.flush()
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -96,13 +99,14 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         loss_dict_reduced = reduce_dict(loss_dict)
         loss_value = sum(loss_dict_reduced.values())
+        loss_scalar = loss_value.detach().item() if isinstance(loss_value, torch.Tensor) else float(loss_value)
 
-        if not math.isfinite(loss_value):
+        if not math.isfinite(loss_scalar):
             print("Loss is {}, stopping training".format(loss_value))
             print(loss_dict_reduced)
             sys.exit(1)
 
-        metric_logger.update(loss=loss_value, **loss_dict_reduced)
+        metric_logger.update(loss=loss_scalar, **loss_dict_reduced)
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
 
         if step % progress_freq == 0 or step == len(data_loader) - 1:
@@ -111,7 +115,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                 step,
                 len(data_loader),
                 progress_start,
-                info=f'loss={loss_value:.4f} lr={optimizer.param_groups[0]["lr"]:.2e}')
+                info=f'loss={loss_scalar:.4f} lr={optimizer.param_groups[0]["lr"]:.2e}')
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
