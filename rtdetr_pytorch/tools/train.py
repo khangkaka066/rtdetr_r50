@@ -6,6 +6,8 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import argparse
 import subprocess
+import time
+from pathlib import Path
 
 import src.misc.dist as dist 
 from src.core import YAMLConfig 
@@ -15,6 +17,19 @@ from src.solver import TASKS
 def prepare_mot17_if_needed(args):
     if not args.mot_root:
         return
+
+    rank = int(os.environ.get('RANK', '0'))
+    train_ann = Path('dataset/mot17/annotations/train.json')
+    val_ann = Path('dataset/mot17/annotations/val.json')
+
+    if rank != 0:
+        print(f'Rank {rank}: waiting for MOT17 annotations prepared by rank 0...')
+        for _ in range(600):
+            if train_ann.exists() and val_ann.exists():
+                print(f'Rank {rank}: MOT17 annotations are ready.')
+                return
+            time.sleep(1)
+        raise TimeoutError('Timed out waiting for MOT17 annotations from rank 0.')
 
     cmd = [
         sys.executable,
