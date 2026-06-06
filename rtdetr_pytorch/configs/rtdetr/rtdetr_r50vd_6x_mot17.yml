@@ -1,0 +1,29 @@
+__include__: [
+  '../dataset/mot17_detection.yml',
+  '../runtime.yml',
+  './include/dataloader.yml',
+  './include/optimizer.yml',
+  './include/rtdetr_r50vd.yml',
+]
+
+output_dir: ./output/rtdetr_r50vd_6x_mot17
+
+# MOT17 is much smaller than COCO; this is a fine-tuning schedule.
+epoches: 24
+
+optimizer:
+  type: AdamW
+  params:
+    -
+      params: 'backbone'
+      lr: 0.000001
+    -
+      params: '^(?=.*encoder(?=.*bias|.*norm.*weight)).*$'
+      weight_decay: 0.
+    -
+      params: '^(?=.*decoder(?=.*bias|.*norm.*weight)).*$'
+      weight_decay: 0.
+
+  lr: 0.00001
+  betas: [0.9, 0.999]
+  weight_decay: 0.0001
