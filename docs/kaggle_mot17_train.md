@@ -128,6 +128,7 @@ python tools/track_mot.py \
   --source /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/test/MOT17-08-FRCNN \
   -r /kaggle/input/models/nguyenvohoangkhang/rtdetr-r50-24epoch/pytorch/default/1/checkpoint.pth \
   --amp \
+  --video-output output/MOT17-08-FRCNN.mp4 \
   --image-size 640 \
   --det-score 0.35 \
   --output output/MOT17-08-FRCNN.txt
@@ -148,4 +149,11 @@ The tracker writes MOTChallenge rows:
 
 ```text
 frame,id,x,y,w,h,score,-1,-1,-1
+```
+
+Create a download link in Kaggle:
+
+```python
+from IPython.display import FileLink
+FileLink("/kaggle/working/rtdetr_r50/rtdetr_pytorch/output/MOT17-08-FRCNN.mp4")
 ```

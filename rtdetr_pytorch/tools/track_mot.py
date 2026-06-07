@@ -8,6 +8,7 @@ sys.path.insert(0, PROJECT_ROOT)
 os.chdir(PROJECT_ROOT)
 
 from PIL import Image, ImageDraw, ImageFont
+import numpy as np
 import torch
 
 from src.tracker import HybridMOTTracker, RTDETRDetector
@@ -49,6 +50,51 @@ def write_mot_row(handle, row):
     )
 
 
+def read_sequence_fps(source, default=30.0):
+    source = Path(source)
+    seqinfo = source / "seqinfo.ini"
+    if not seqinfo.exists() and source.name == "img1":
+        seqinfo = source.parent / "seqinfo.ini"
+    if not seqinfo.exists():
+        return float(default)
+
+    for line in seqinfo.read_text().splitlines():
+        if line.startswith("frameRate="):
+            try:
+                return float(line.split("=", 1)[1])
+            except ValueError:
+                return float(default)
+    return float(default)
+
+
+class VideoWriter:
+    def __init__(self, path, fps):
+        self.path = Path(path) if path else None
+        self.fps = float(fps)
+        self.writer = None
+
+    def write(self, image):
+        if self.path is None:
+            return
+        try:
+            import cv2
+        except ImportError as exc:
+            raise ImportError("Install opencv-python-headless to write video output.") from exc
+
+        frame = np.asarray(image.convert("RGB"))
+        height, width = frame.shape[:2]
+        if self.writer is None:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            self.writer = cv2.VideoWriter(str(self.path), fourcc, self.fps, (width, height))
+        self.writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+
+    def close(self):
+        if self.writer is not None:
+            self.writer.release()
+            self.writer = None
+
+
 def main(args):
     frames = list_frames(args.source)
     if not frames:
@@ -86,31 +132,43 @@ def main(args):
     vis_dir = Path(args.vis_dir) if args.vis_dir else None
     if vis_dir:
         vis_dir.mkdir(parents=True, exist_ok=True)
+    fps = args.video_fps if args.video_fps > 0 else read_sequence_fps(args.source)
+    video_writer = VideoWriter(args.video_output, fps)
 
     print(f"Tracking {len(frames)} frames from {find_image_dir(args.source)}")
     print(f"Writing MOT results to {out_path}")
-    with out_path.open("w") as handle:
-        for idx, frame_path in enumerate(frames, start=1):
-            image = Image.open(frame_path).convert("RGB")
-            detections = detector(image)
-            tracks = tracker.update(detections)
-            rows = []
-            for track in tracks:
-                if track.is_missing and not args.write_missing:
-                    continue
-                rows.append(track.mot_row(idx))
-            for row in rows:
-                write_mot_row(handle, row)
+    if args.video_output:
+        print(f"Writing video to {args.video_output} at {fps:g} FPS")
+    try:
+        with out_path.open("w") as handle:
+            for idx, frame_path in enumerate(frames, start=1):
+                image = Image.open(frame_path).convert("RGB")
+                detections = detector(image)
+                tracks = tracker.update(detections)
+                rows = []
+                for track in tracks:
+                    if track.is_missing and not args.write_missing:
+                        continue
+                    rows.append(track.mot_row(idx))
+                for row in rows:
+                    write_mot_row(handle, row)
 
-            if vis_dir:
-                draw_tracks(image, tracks).save(vis_dir / frame_path.name)
+                annotated = None
+                if vis_dir or args.video_output:
+                    annotated = draw_tracks(image, tracks)
+                if vis_dir:
+                    annotated.save(vis_dir / frame_path.name)
+                if args.video_output:
+                    video_writer.write(annotated)
 
-            if idx == 1 or idx % args.log_step == 0 or idx == len(frames):
-                print(
-                    f"Frame {idx}/{len(frames)} "
-                    f"detections={len(detections)} active_tracks={len(tracks)} written={len(rows)}",
-                    flush=True,
-                )
+                if idx == 1 or idx % args.log_step == 0 or idx == len(frames):
+                    print(
+                        f"Frame {idx}/{len(frames)} "
+                        f"detections={len(detections)} active_tracks={len(tracks)} written={len(rows)}",
+                        flush=True,
+                    )
+    finally:
+        video_writer.close()
 
 
 if __name__ == "__main__":
@@ -120,6 +178,8 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--resume", required=True, help="RT-DETR detector checkpoint")
     parser.add_argument("--output", default="output/tracks.txt")
     parser.add_argument("--vis-dir", default="", help="optional directory for annotated frames")
+    parser.add_argument("--video-output", default="", help="optional annotated MP4 output path")
+    parser.add_argument("--video-fps", type=float, default=0.0, help="video FPS; 0 reads seqinfo.ini or uses 30")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--image-size", type=int, default=640)
