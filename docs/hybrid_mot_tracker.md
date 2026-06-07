@@ -71,6 +71,35 @@ from IPython.display import FileLink
 FileLink("/kaggle/working/rtdetr_r50/rtdetr_pytorch/output/MOT17-08-FRCNN.mp4")
 ```
 
+## Evaluation
+
+`MOTA`, `IDF1`, `HOTA`, `FN`, `FP`, and `IDs` require ground truth. `MOT17/test` does not include ground truth, so local evaluation must use `MOT17/train` sequences.
+
+```bash
+cd /kaggle/working
+git clone https://github.com/JonathonLuiten/TrackEval.git
+pip install -r TrackEval/requirements.txt
+
+cd /kaggle/working/rtdetr_r50/rtdetr_pytorch
+mkdir -p output/mot17_eval
+
+python tools/track_mot.py \
+  --source /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train/MOT17-02-FRCNN \
+  -r /kaggle/input/models/nguyenvohoangkhang/rtdetr-r50-24epoch/pytorch/default/1/checkpoint.pth \
+  --amp \
+  --det-score 0.10 \
+  --track-score 0.45 \
+  --low-track-score 0.10 \
+  --nms-iou 0.60 \
+  --output output/mot17_eval/MOT17-02-FRCNN.txt
+
+python tools/eval_mot17_trackeval.py \
+  --mot-root /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train \
+  --results-dir output/mot17_eval \
+  --trackeval-root /kaggle/working/TrackEval \
+  --seqs MOT17-02-FRCNN
+```
+
 ## Main Files
 
 - `tools/track_mot.py`: Kaggle entrypoint.

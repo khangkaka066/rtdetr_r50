@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import time
 from pathlib import Path
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -144,6 +145,8 @@ def main(args):
     print(f"Writing MOT results to {out_path}")
     if args.video_output:
         print(f"Writing video to {args.video_output} at {fps:g} FPS")
+    start_time = time.time()
+    processed_frames = 0
     try:
         with out_path.open("w") as handle:
             for idx, frame_path in enumerate(frames, start=1):
@@ -165,6 +168,7 @@ def main(args):
                     annotated.save(vis_dir / frame_path.name)
                 if args.video_output:
                     video_writer.write(annotated)
+                processed_frames = idx
 
                 if idx == 1 or idx % args.log_step == 0 or idx == len(frames):
                     print(
@@ -174,6 +178,8 @@ def main(args):
                     )
     finally:
         video_writer.close()
+    elapsed = max(time.time() - start_time, 1e-9)
+    print(f"Tracking time: {elapsed:.2f}s, FPS: {processed_frames / elapsed:.2f}")
 
 
 if __name__ == "__main__":

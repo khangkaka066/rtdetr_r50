@@ -163,3 +163,51 @@ Create a download link in Kaggle:
 from IPython.display import FileLink
 FileLink("/kaggle/working/rtdetr_r50/rtdetr_pytorch/output/MOT17-08-FRCNN.mp4")
 ```
+
+## 7. Evaluate MOT Metrics
+
+Metrics such as `MOTA`, `IDF1`, `HOTA`, `FN`, `FP`, and `IDs` need ground truth, so they cannot be computed locally on `MOT17/test`. Use `MOT17/train` sequences for local evaluation.
+
+Install TrackEval:
+
+```bash
+cd /kaggle/working
+git clone https://github.com/JonathonLuiten/TrackEval.git
+pip install -r TrackEval/requirements.txt
+```
+
+Run tracker on one train sequence:
+
+```bash
+cd /kaggle/working/rtdetr_r50/rtdetr_pytorch
+mkdir -p output/mot17_eval
+
+python tools/track_mot.py \
+  --source /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train/MOT17-02-FRCNN \
+  -r /kaggle/input/models/nguyenvohoangkhang/rtdetr-r50-24epoch/pytorch/default/1/checkpoint.pth \
+  --amp \
+  --det-score 0.10 \
+  --track-score 0.45 \
+  --low-track-score 0.10 \
+  --nms-iou 0.60 \
+  --output output/mot17_eval/MOT17-02-FRCNN.txt
+```
+
+Evaluate:
+
+```bash
+python tools/eval_mot17_trackeval.py \
+  --mot-root /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train \
+  --results-dir output/mot17_eval \
+  --trackeval-root /kaggle/working/TrackEval \
+  --seqs MOT17-02-FRCNN
+```
+
+For all train sequences, first create one result file per sequence in `output/mot17_eval/`, then run:
+
+```bash
+python tools/eval_mot17_trackeval.py \
+  --mot-root /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train \
+  --results-dir output/mot17_eval \
+  --trackeval-root /kaggle/working/TrackEval
+```
