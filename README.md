@@ -48,17 +48,6 @@ Evaluate:
 python tools/train.py -c configs/rtdetr/rtdetr_r50vd_6x_coco.yml -r path/to/checkpoint.pth --test-only
 ```
 
-Track MOT17 with the RT-DETR checkpoint:
-
-```bash
-python tools/track_mot.py \
-  --source /path/to/MOT17-08-FRCNN \
-  -r /path/to/checkpoint.pth \
-  --output output/MOT17-08-FRCNN.txt
-```
-
-See `docs/hybrid_mot_tracker.md` for the Kalman + xLSTM/LNN hybrid tracker pipeline and Kaggle commands.
-
 Export ONNX:
 
 ```bash

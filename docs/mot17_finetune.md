@@ -94,4 +94,4 @@ python tools/train.py \
   --test-only
 ```
 
-This trains a person detector, not a full tracker. Use its detections as input to your MOT tracker.
+This trains a person detector.
