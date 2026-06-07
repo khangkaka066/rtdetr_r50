@@ -118,3 +118,34 @@ checkpoint.pth
 log.txt
 eval/
 ```
+
+## 6. Run MOT Tracker
+
+After training or after adding a saved Kaggle Model checkpoint, run the hybrid tracker on one MOT17 sequence:
+
+```bash
+python tools/track_mot.py \
+  --source /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/test/MOT17-08-FRCNN \
+  -r /kaggle/input/models/nguyenvohoangkhang/rtdetr-r50-24epoch/pytorch/default/1/checkpoint.pth \
+  --amp \
+  --image-size 640 \
+  --det-score 0.35 \
+  --output output/MOT17-08-FRCNN.txt
+```
+
+To save annotated frames:
+
+```bash
+python tools/track_mot.py \
+  --source /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/test/MOT17-08-FRCNN \
+  -r /kaggle/input/models/nguyenvohoangkhang/rtdetr-r50-24epoch/pytorch/default/1/checkpoint.pth \
+  --amp \
+  --vis-dir output/vis/MOT17-08-FRCNN \
+  --output output/MOT17-08-FRCNN.txt
+```
+
+The tracker writes MOTChallenge rows:
+
+```text
+frame,id,x,y,w,h,score,-1,-1,-1
+```
