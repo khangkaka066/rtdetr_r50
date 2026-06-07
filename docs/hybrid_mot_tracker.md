@@ -24,6 +24,29 @@ Kalman prediction + IoU matching + detection score fusion + color appearance
 The xLSTM/LNN residual motion branch is only enabled when you pass
 `--enable-neural-motion` or `--motion-checkpoint`.
 
+## xLSTM Backend
+
+The neural motion branch can use the official NX-AI xLSTM package:
+
+```python
+!pip install xlstm dacite omegaconf
+```
+
+Run with xLSTM enabled:
+
+```bash
+python tools/track_mot.py \
+  --source /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train/MOT17-02-FRCNN \
+  -r /kaggle/input/models/nguyenvohoangkhang/r50/pytorch/default/1/checkpoint.pth \
+  --enable-neural-motion \
+  --motion-backend xlstm \
+  --output output/mot17_eval_xlstm/MOT17-02-FRCNN.txt
+```
+
+If you do not pass a trained `--motion-checkpoint`, the xLSTM residual heads
+are zero-initialized so they do not overpower Kalman predictions. Train a
+motion checkpoint before expecting IDF1/IDSW gains from xLSTM.
+
 ## Kaggle Run
 
 ```python

@@ -171,6 +171,20 @@ FileLink("/kaggle/working/rtdetr_r50/rtdetr_pytorch/output/MOT17-08-FRCNN.mp4")
 
 Metrics such as `MOTA`, `IDF1`, `HOTA`, `FN`, `FP`, and `IDs` need ground truth, so they cannot be computed locally on `MOT17/test`. Use `MOT17/train` sequences for local evaluation.
 
+Optional xLSTM motion backend:
+
+```bash
+pip install xlstm dacite omegaconf
+```
+
+Then add:
+
+```bash
+--enable-neural-motion --motion-backend xlstm
+```
+
+Use this only for experiments unless you also provide a trained `--motion-checkpoint`.
+
 Install TrackEval:
 
 ```bash

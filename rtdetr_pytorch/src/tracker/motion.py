@@ -47,8 +47,8 @@ class KalmanBoxFilter:
         return self.x[4:8].copy()
 
 
-class XLSTMResidualPredictor(nn.Module):
-    """LSTM-based placeholder for the xLSTM residual branch.
+class LSTMResidualPredictor(nn.Module):
+    """Fallback LSTM residual branch.
 
     The heads are zero-initialized, so an untrained motion module does not
     damage Kalman predictions. Train or load this module to make residuals
@@ -75,6 +75,74 @@ class XLSTMResidualPredictor(nn.Module):
         out, state = self.rnn(history, state)
         last = out[:, -1]
         return self.residual(last), self.log_var(last), state
+
+
+class OfficialXLSTMResidualPredictor(nn.Module):
+    """NX-AI xLSTM residual branch over per-track motion history.
+
+    Uses the official `xlstm` package when neural motion is explicitly enabled.
+    The module is stateless at inference: the track history deque is the memory
+    source, and the last xLSTM token becomes the residual prediction feature.
+    """
+
+    def __init__(self, input_dim=12, hidden_dim=64, context_length=16, num_blocks=2):
+        super().__init__()
+        try:
+            from xlstm import (
+                FeedForwardConfig,
+                mLSTMBlockConfig,
+                mLSTMLayerConfig,
+                xLSTMBlockStack,
+                xLSTMBlockStackConfig,
+            )
+        except ImportError as exc:
+            raise ImportError(
+                "Official xLSTM backend requires `pip install xlstm dacite omegaconf`."
+            ) from exc
+
+        self.hidden_dim = hidden_dim
+        self.context_length = context_length
+        self.input_proj = nn.Linear(input_dim, hidden_dim)
+        self.xlstm = xLSTMBlockStack(
+            xLSTMBlockStackConfig(
+                mlstm_block=mLSTMBlockConfig(
+                    mlstm=mLSTMLayerConfig(
+                        conv1d_kernel_size=4,
+                        qkv_proj_blocksize=4,
+                        num_heads=4,
+                    ),
+                    feedforward=FeedForwardConfig(proj_factor=1.3, act_fn="gelu"),
+                ),
+                context_length=context_length,
+                num_blocks=num_blocks,
+                embedding_dim=hidden_dim,
+            )
+        )
+        self.residual = nn.Linear(hidden_dim, 4)
+        self.log_var = nn.Linear(hidden_dim, 4)
+        nn.init.zeros_(self.residual.weight)
+        nn.init.zeros_(self.residual.bias)
+        nn.init.zeros_(self.log_var.weight)
+        nn.init.constant_(self.log_var.bias, -2.0)
+
+    def initial_state(self, device):
+        return None
+
+    def forward(self, history, state):
+        history = self._pad_or_trim(history)
+        x = self.input_proj(history)
+        out = self.xlstm(x)
+        last = out[:, -1]
+        return self.residual(last), self.log_var(last), {"hidden": last}
+
+    def _pad_or_trim(self, history):
+        if history.shape[1] > self.context_length:
+            return history[:, -self.context_length :]
+        if history.shape[1] == self.context_length:
+            return history
+        pad_len = self.context_length - history.shape[1]
+        pad = history[:, :1].repeat(1, pad_len, 1)
+        return torch.cat([pad, history], dim=1)
 
 
 class LNNResidualPredictor(nn.Module):
@@ -116,15 +184,23 @@ class FusionGate(nn.Module):
         nn.init.zeros_(self.net[-1].bias)
 
     def forward(self, xlstm_state, lnn_state, extra):
-        h_x = xlstm_state[0][-1]
+        if isinstance(xlstm_state, dict):
+            h_x = xlstm_state["hidden"]
+        else:
+            h_x = xlstm_state[0][-1]
         data = torch.cat([h_x, lnn_state, extra], dim=-1)
         return torch.sigmoid(self.net(data))
 
 
 class HybridResidualMotion(nn.Module):
-    def __init__(self, history_dim=12, lnn_input_dim=16, hidden_dim=64):
+    def __init__(self, history_dim=12, lnn_input_dim=16, hidden_dim=64, motion_backend="xlstm"):
         super().__init__()
-        self.xlstm = XLSTMResidualPredictor(history_dim, hidden_dim)
+        if motion_backend == "xlstm":
+            self.xlstm = OfficialXLSTMResidualPredictor(history_dim, hidden_dim)
+        elif motion_backend == "lstm":
+            self.xlstm = LSTMResidualPredictor(history_dim, hidden_dim)
+        else:
+            raise ValueError(f"Unsupported motion backend: {motion_backend}")
         self.lnn = LNNResidualPredictor(lnn_input_dim, hidden_dim)
         self.gate = FusionGate(hidden_dim, hidden_dim, extra_dim=4)
 

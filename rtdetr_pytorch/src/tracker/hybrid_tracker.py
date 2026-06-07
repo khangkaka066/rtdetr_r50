@@ -59,6 +59,7 @@ class HybridMOTTracker:
         low_match_cost_threshold=0.70,
         fuse_score=True,
         use_neural_motion=False,
+        motion_backend="xlstm",
         motion_checkpoint=None,
     ):
         self.width, self.height = image_size
@@ -84,7 +85,7 @@ class HybridMOTTracker:
         self.next_id = 1
         self.frame_id = 0
 
-        self.motion_net = HybridResidualMotion().to(self.device) if use_neural_motion else None
+        self.motion_net = HybridResidualMotion(motion_backend=motion_backend).to(self.device) if use_neural_motion else None
         if self.motion_net is not None and motion_checkpoint:
             state = torch.load(motion_checkpoint, map_location=self.device)
             if "model" in state:
