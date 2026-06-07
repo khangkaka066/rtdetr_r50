@@ -130,7 +130,9 @@ python tools/track_mot.py \
   --amp \
   --video-output output/MOT17-08-FRCNN.mp4 \
   --image-size 640 \
-  --det-score 0.35 \
+  --det-score 0.10 \
+  --track-score 0.45 \
+  --low-track-score 0.10 \
   --output output/MOT17-08-FRCNN.txt
 ```
 
@@ -142,6 +144,8 @@ python tools/track_mot.py \
   -r /kaggle/input/models/nguyenvohoangkhang/rtdetr-r50-24epoch/pytorch/default/1/checkpoint.pth \
   --amp \
   --vis-dir output/vis/MOT17-08-FRCNN \
+  --det-score 0.10 \
+  --track-score 0.45 \
   --output output/MOT17-08-FRCNN.txt
 ```
 

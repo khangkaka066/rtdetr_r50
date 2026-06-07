@@ -152,6 +152,11 @@ class HybridResidualMotion(nn.Module):
             {"xlstm": xlstm_state, "lnn": lnn_state},
         )
 
+    def update_state(self, history, lnn_input, state, dt):
+        _, _, xlstm_state = self.xlstm(history, state["xlstm"])
+        _, _, lnn_state = self.lnn(lnn_input, state["lnn"], dt)
+        return {"xlstm": xlstm_state, "lnn": lnn_state}
+
 
 @dataclass
 class MotionState:

@@ -32,6 +32,7 @@ class RTDETRDetector:
     score_threshold: float = 0.35
     person_label: int | None = 0
     amp: bool = True
+    color_embedding: bool = True
 
     def __post_init__(self):
         if self.device == "cuda" and not torch.cuda.is_available():
@@ -74,14 +75,36 @@ class RTDETRDetector:
             label = int(label)
             if self.person_label is not None and label != self.person_label:
                 continue
+            embedding = self._color_embedding(image, xyxy) if self.color_embedding else None
             detections.append(
                 Detection(
                     bbox=xyxy_to_cxcywh(xyxy),
                     score=float(score),
                     label=label,
+                    embedding=embedding,
                 )
             )
         return detections
+
+    @staticmethod
+    def _color_embedding(image, xyxy, bins=8):
+        width, height = image.size
+        x1, y1, x2, y2 = xyxy
+        x1 = int(max(0, min(width - 1, x1)))
+        y1 = int(max(0, min(height - 1, y1)))
+        x2 = int(max(x1 + 1, min(width, x2)))
+        y2 = int(max(y1 + 1, min(height, y2)))
+        crop = image.crop((x1, y1, x2, y2)).resize((32, 64))
+        arr = np.asarray(crop, dtype=np.float32) / 255.0
+        parts = []
+        for channel in range(3):
+            hist, _ = np.histogram(arr[:, :, channel], bins=bins, range=(0.0, 1.0))
+            parts.append(hist.astype(np.float32))
+        emb = np.concatenate(parts)
+        norm = np.linalg.norm(emb)
+        if norm > 1e-12:
+            emb = emb / norm
+        return emb.astype(np.float32)
 
 
 def resolve_checkpoint(path):

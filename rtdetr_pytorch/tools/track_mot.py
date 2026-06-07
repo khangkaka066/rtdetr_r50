@@ -113,6 +113,7 @@ def main(args):
         score_threshold=args.det_score,
         person_label=None if args.all_classes else args.person_label,
         amp=args.amp,
+        color_embedding=not args.disable_color_embedding,
     )
     tracker = HybridMOTTracker(
         image_size=first.size,
@@ -120,6 +121,7 @@ def main(args):
         max_age=args.max_age,
         min_hits=args.min_hits,
         score_threshold=args.track_score,
+        low_score_threshold=args.low_track_score,
         lambda_motion=args.lambda_motion,
         lambda_iou=args.lambda_iou,
         lambda_app=args.lambda_app,
@@ -183,17 +185,19 @@ if __name__ == "__main__":
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--image-size", type=int, default=640)
-    parser.add_argument("--det-score", type=float, default=0.35)
-    parser.add_argument("--track-score", type=float, default=0.35)
+    parser.add_argument("--det-score", type=float, default=0.10)
+    parser.add_argument("--track-score", type=float, default=0.45)
+    parser.add_argument("--low-track-score", type=float, default=0.10)
     parser.add_argument("--person-label", type=int, default=0)
     parser.add_argument("--all-classes", action="store_true")
     parser.add_argument("--max-age", type=int, default=30)
     parser.add_argument("--min-hits", type=int, default=3)
-    parser.add_argument("--lambda-motion", type=float, default=0.25)
+    parser.add_argument("--lambda-motion", type=float, default=0.15)
     parser.add_argument("--lambda-iou", type=float, default=0.65)
-    parser.add_argument("--lambda-app", type=float, default=0.10)
+    parser.add_argument("--lambda-app", type=float, default=0.20)
     parser.add_argument("--motion-checkpoint", default="", help="optional trained xLSTM/LNN residual checkpoint")
     parser.add_argument("--disable-neural-motion", action="store_true")
+    parser.add_argument("--disable-color-embedding", action="store_true")
     parser.add_argument("--write-missing", action="store_true", help="also write predicted boxes for missing tracks")
     parser.add_argument("--log-step", type=int, default=50)
     main(parser.parse_args())

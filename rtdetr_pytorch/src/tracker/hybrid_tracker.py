@@ -46,11 +46,13 @@ class HybridMOTTracker:
         max_age=30,
         min_hits=3,
         score_threshold=0.35,
-        lambda_motion=0.25,
+        low_score_threshold=0.10,
+        lambda_motion=0.15,
         lambda_iou=0.65,
-        lambda_app=0.10,
-        max_mahalanobis=25.0,
+        lambda_app=0.20,
+        max_mahalanobis=80.0,
         min_iou=0.02,
+        second_stage_min_iou=0.001,
         use_neural_motion=True,
         motion_checkpoint=None,
     ):
@@ -61,11 +63,13 @@ class HybridMOTTracker:
         self.max_age = int(max_age)
         self.min_hits = int(min_hits)
         self.score_threshold = float(score_threshold)
+        self.low_score_threshold = float(low_score_threshold)
         self.lambda_motion = float(lambda_motion)
         self.lambda_iou = float(lambda_iou)
         self.lambda_app = float(lambda_app)
         self.max_mahalanobis = float(max_mahalanobis)
         self.min_iou = float(min_iou)
+        self.second_stage_min_iou = float(second_stage_min_iou)
         self.tracks = []
         self.next_id = 1
         self.frame_id = 0
@@ -81,9 +85,32 @@ class HybridMOTTracker:
 
     def update(self, detections, dt=1.0):
         self.frame_id += 1
-        detections = [d for d in detections if d.score >= self.score_threshold]
+        detections = [d for d in detections if d.score >= self.low_score_threshold]
+        high_det_indices = [i for i, d in enumerate(detections) if d.score >= self.score_threshold]
+        low_det_indices = [i for i, d in enumerate(detections) if d.score < self.score_threshold]
         predictions = [self._predict_track(track, dt) for track in self.tracks]
-        matches, unmatched_tracks, unmatched_detections = self._match(predictions, detections)
+        all_track_indices = list(range(len(self.tracks)))
+        matches, unmatched_tracks, unmatched_high_detections = self._match(
+            predictions,
+            detections,
+            all_track_indices,
+            high_det_indices,
+            min_iou=self.min_iou,
+            max_mahalanobis=self.max_mahalanobis,
+        )
+
+        low_matches, unmatched_tracks, _ = self._match(
+            predictions,
+            detections,
+            unmatched_tracks,
+            low_det_indices,
+            min_iou=self.second_stage_min_iou,
+            max_mahalanobis=self.max_mahalanobis * 2.0,
+            lambda_motion=0.05,
+            lambda_iou=0.90,
+            lambda_app=0.05,
+        )
+        matches.extend(low_matches)
 
         for track_idx, det_idx in matches:
             self._update_matched(self.tracks[track_idx], detections[det_idx], dt)
@@ -91,7 +118,7 @@ class HybridMOTTracker:
         for track_idx in unmatched_tracks:
             self._update_missing(self.tracks[track_idx], predictions[track_idx], dt)
 
-        for det_idx in unmatched_detections:
+        for det_idx in unmatched_high_detections:
             self._start_track(detections[det_idx])
 
         self.tracks = [t for t in self.tracks if t.missing_count <= self.max_age]
@@ -118,26 +145,44 @@ class HybridMOTTracker:
         uncertainty = p_kf + np.diag(residual_unc + 1e-3).astype(np.float32)
         return bbox_pred, uncertainty
 
-    def _match(self, predictions, detections):
-        if not predictions:
-            return [], [], list(range(len(detections)))
-        if not detections:
-            return [], list(range(len(predictions))), []
+    def _match(
+        self,
+        predictions,
+        detections,
+        track_indices,
+        detection_indices,
+        min_iou,
+        max_mahalanobis,
+        lambda_motion=None,
+        lambda_iou=None,
+        lambda_app=None,
+    ):
+        if not track_indices:
+            return [], [], list(detection_indices)
+        if not detection_indices:
+            return [], list(track_indices), []
 
-        cost = np.full((len(predictions), len(detections)), 1e6, dtype=np.float32)
-        for i, (bbox_pred, uncertainty) in enumerate(predictions):
-            for j, det in enumerate(detections):
+        lambda_motion = self.lambda_motion if lambda_motion is None else float(lambda_motion)
+        lambda_iou = self.lambda_iou if lambda_iou is None else float(lambda_iou)
+        lambda_app = self.lambda_app if lambda_app is None else float(lambda_app)
+
+        cost = np.full((len(track_indices), len(detection_indices)), 1e6, dtype=np.float32)
+        for local_i, track_idx in enumerate(track_indices):
+            bbox_pred, uncertainty = predictions[track_idx]
+            for local_j, det_idx in enumerate(detection_indices):
+                det = detections[det_idx]
                 motion_cost = self._mahalanobis(bbox_pred, det.bbox, uncertainty)
                 iou = iou_cxcywh(bbox_pred, det.bbox)
-                app_cost = cosine_distance(self.tracks[i].appearance, det.embedding)
-                if motion_cost > self.max_mahalanobis:
+                app_cost = cosine_distance(self.tracks[track_idx].appearance, det.embedding)
+                if motion_cost > max_mahalanobis:
                     continue
-                if iou < self.min_iou and motion_cost > self.max_mahalanobis * 0.35:
+                if iou < min_iou and motion_cost > max_mahalanobis * 0.35:
                     continue
-                cost[i, j] = (
-                    self.lambda_motion * motion_cost
-                    + self.lambda_iou * (1.0 - iou)
-                    + self.lambda_app * app_cost
+                normalized_motion = min(motion_cost / max(max_mahalanobis, 1e-6), 1.0)
+                cost[local_i, local_j] = (
+                    lambda_motion * normalized_motion
+                    + lambda_iou * (1.0 - iou)
+                    + lambda_app * app_cost
                 )
 
         row_ind, col_ind = linear_sum_assignment(cost)
@@ -147,12 +192,14 @@ class HybridMOTTracker:
         for r, c in zip(row_ind, col_ind):
             if cost[r, c] >= 1e6:
                 continue
-            matches.append((int(r), int(c)))
-            used_tracks.add(int(r))
-            used_dets.add(int(c))
+            track_idx = int(track_indices[r])
+            det_idx = int(detection_indices[c])
+            matches.append((track_idx, det_idx))
+            used_tracks.add(track_idx)
+            used_dets.add(det_idx)
 
-        unmatched_tracks = [i for i in range(len(predictions)) if i not in used_tracks]
-        unmatched_detections = [j for j in range(len(detections)) if j not in used_dets]
+        unmatched_tracks = [i for i in track_indices if i not in used_tracks]
+        unmatched_detections = [j for j in detection_indices if j not in used_dets]
         return matches, unmatched_tracks, unmatched_detections
 
     def _update_matched(self, track, detection, dt):
@@ -161,7 +208,7 @@ class HybridMOTTracker:
         feature = self._feature_vector(detection.bbox, velocity, dt, 0, 0, detection.score)
         track.history.append(feature)
         if self.motion_net is not None:
-            track.neural_state = self._update_neural_state(track, detection.bbox, dt, is_missing=False)
+            track.neural_state = self._update_neural_state(track, detection.bbox, dt, False, 0, detection.score)
         track.bbox = detection.bbox
         track.score = detection.score
         track.age += 1
@@ -181,7 +228,14 @@ class HybridMOTTracker:
         feature = self._feature_vector(bbox_pred, velocity, dt, 1, track.missing_count + 1, 0.0)
         track.history.append(feature)
         if self.motion_net is not None:
-            track.neural_state = self._update_neural_state(track, bbox_pred, dt, is_missing=True)
+            track.neural_state = self._update_neural_state(
+                track,
+                bbox_pred,
+                dt,
+                True,
+                track.missing_count + 1,
+                0.0,
+            )
         track.bbox = bbox_pred
         track.score = max(0.0, track.score * 0.95)
         track.age += 1
@@ -225,10 +279,24 @@ class HybridMOTTracker:
         acceleration = np.zeros(4, dtype=np.float32)
         return torch.tensor(np.concatenate([feature, acceleration]), dtype=torch.float32, device=self.device).unsqueeze(0)
 
-    def _update_neural_state(self, track, bbox, dt, is_missing):
-        # The recurrent state is already advanced during predict; this keeps
-        # the API aligned with the paper-style pipeline.
-        return track.neural_state
+    def _update_neural_state(self, track, bbox, dt, is_missing, missing_count, score):
+        feature = self._feature_vector(
+            bbox,
+            track.motion.velocity,
+            dt,
+            int(is_missing),
+            missing_count,
+            score,
+        )
+        acceleration = np.zeros(4, dtype=np.float32)
+        history = self._history_tensor(track)
+        lnn_input = torch.tensor(
+            np.concatenate([feature, acceleration]),
+            dtype=torch.float32,
+            device=self.device,
+        ).unsqueeze(0)
+        with torch.no_grad():
+            return self.motion_net.update_state(history, lnn_input, track.neural_state, dt)
 
     def _feature_vector(self, bbox, velocity, dt, is_missing, missing_count, score):
         scale = np.array([self.width, self.height, self.width, self.height], dtype=np.float32)

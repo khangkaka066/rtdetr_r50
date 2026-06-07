@@ -37,7 +37,9 @@ Run one MOT17 sequence:
   --amp \
   --video-output output/MOT17-08-FRCNN.mp4 \
   --image-size 640 \
-  --det-score 0.35 \
+  --det-score 0.10 \
+  --track-score 0.45 \
+  --low-track-score 0.10 \
   --output output/MOT17-08-FRCNN.txt
 ```
 
@@ -49,6 +51,8 @@ Add visualization frames:
   -r /kaggle/input/models/nguyenvohoangkhang/rtdetr-r50-24epoch/pytorch/default/1/checkpoint.pth \
   --amp \
   --vis-dir output/vis/MOT17-08-FRCNN \
+  --det-score 0.10 \
+  --track-score 0.45 \
   --output output/MOT17-08-FRCNN.txt
 ```
 
@@ -75,5 +79,6 @@ FileLink("/kaggle/working/rtdetr_r50/rtdetr_pytorch/output/MOT17-08-FRCNN.mp4")
 ## Notes
 
 - `--image-size 800` can improve small-person recall but costs more VRAM.
+- Use `--det-score 0.10` with `--track-score 0.45` to keep low-confidence detections for association without creating too many new tracks.
 - `--motion-checkpoint path.pth` can load trained xLSTM/LNN residual weights.
 - `--disable-neural-motion` runs only Kalman + IoU matching.
