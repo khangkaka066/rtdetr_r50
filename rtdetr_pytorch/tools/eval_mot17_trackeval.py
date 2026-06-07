@@ -1,6 +1,5 @@
 import argparse
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -66,40 +65,49 @@ def prepare_trackeval_layout(args):
 
 
 def run_trackeval(args, gt_folder, trackers_folder, seqmap_file):
-    script = Path(args.trackeval_root) / "scripts" / "run_mot_challenge.py"
-    if not script.exists():
+    trackeval_root = Path(args.trackeval_root)
+    if not (trackeval_root / "trackeval").exists():
         raise FileNotFoundError(
-            f"TrackEval script not found: {script}\n"
+            f"TrackEval package not found: {trackeval_root / 'trackeval'}\n"
             "Clone it first: git clone https://github.com/JonathonLuiten/TrackEval.git"
         )
 
-    cmd = [
-        sys.executable,
-        str(script),
-        "--GT_FOLDER",
-        str(gt_folder),
-        "--TRACKERS_FOLDER",
-        str(trackers_folder),
-        "--BENCHMARK",
-        args.benchmark,
-        "--SPLIT_TO_EVAL",
-        args.split,
-        "--TRACKERS_TO_EVAL",
-        args.tracker_name,
-        "--SEQMAP_FILE",
-        str(seqmap_file),
-        "--METRICS",
-        "HOTA",
-        "CLEAR",
-        "Identity",
-        "--USE_PARALLEL",
-        "False",
-        "--PRINT_CONFIG",
-        "False",
+    sys.path.insert(0, str(trackeval_root))
+    import trackeval
+
+    eval_config = trackeval.Evaluator.get_default_eval_config()
+    eval_config.update({
+        "USE_PARALLEL": False,
+        "PRINT_CONFIG": False,
+        "DISPLAY_LESS_PROGRESS": True,
+    })
+
+    dataset_config = trackeval.datasets.MotChallenge2DBox.get_default_dataset_config()
+    dataset_config.update({
+        "GT_FOLDER": str(gt_folder),
+        "TRACKERS_FOLDER": str(trackers_folder),
+        "BENCHMARK": args.benchmark,
+        "SPLIT_TO_EVAL": args.split,
+        "TRACKERS_TO_EVAL": [args.tracker_name],
+        "SEQMAP_FILE": str(seqmap_file),
+        "CLASSES_TO_EVAL": ["pedestrian"],
+        "PRINT_CONFIG": False,
+    })
+
+    metrics_config = {
+        "METRICS": ["HOTA", "CLEAR", "Identity"],
+        "THRESHOLD": 0.5,
+        "PRINT_CONFIG": False,
+    }
+    evaluator = trackeval.Evaluator(eval_config)
+    dataset_list = [trackeval.datasets.MotChallenge2DBox(dataset_config)]
+    metrics_list = [
+        trackeval.metrics.HOTA(metrics_config),
+        trackeval.metrics.CLEAR(metrics_config),
+        trackeval.metrics.Identity(metrics_config),
     ]
-    print("Running TrackEval:")
-    print(" ".join(cmd))
-    subprocess.run(cmd, check=True)
+    print("Running TrackEval with Python API")
+    evaluator.evaluate(dataset_list, metrics_list)
 
 
 def main():
