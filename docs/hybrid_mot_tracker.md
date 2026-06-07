@@ -15,10 +15,16 @@ with zero-initialized residual heads. That means the tracker is safe to run
 without a separate motion checkpoint: it behaves like a Kalman/IoU tracker
 until you train or load residual motion weights.
 
-By default, `tools/track_mot.py` runs the ByteTrack-like path:
+By default, `tools/track_mot.py` runs `ByteTrackXLSTMTracker`:
 
 ```text
-Kalman prediction + IoU matching + detection score fusion + color appearance
+Tracked / Lost / Removed pools
++ Kalman xyah prediction
++ high-score and low-score ByteTrack association
++ IoU matching
++ detection score fusion
++ color appearance cost
++ optional xLSTM/LNN residual motion
 ```
 
 The xLSTM/LNN residual motion branch is only enabled when you pass
@@ -38,6 +44,7 @@ Run with xLSTM enabled:
 python tools/track_mot.py \
   --source /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train/MOT17-02-FRCNN \
   -r /kaggle/input/models/nguyenvohoangkhang/r50/pytorch/default/1/checkpoint.pth \
+  --tracker byte_xlstm \
   --enable-neural-motion \
   --motion-backend xlstm \
   --output output/mot17_eval_xlstm/MOT17-02-FRCNN.txt
@@ -66,6 +73,7 @@ Run one MOT17 sequence:
   -r /kaggle/input/models/nguyenvohoangkhang/rtdetr-r50-24epoch/pytorch/default/1/checkpoint.pth \
   --amp \
   --video-output output/MOT17-08-FRCNN.mp4 \
+  --tracker byte_xlstm \
   --image-size 640 \
   --det-score 0.10 \
   --track-score 0.45 \
@@ -84,6 +92,7 @@ Add visualization frames:
   --source /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/test/MOT17-08-FRCNN \
   -r /kaggle/input/models/nguyenvohoangkhang/rtdetr-r50-24epoch/pytorch/default/1/checkpoint.pth \
   --amp \
+  --tracker byte_xlstm \
   --vis-dir output/vis/MOT17-08-FRCNN \
   --det-score 0.10 \
   --track-score 0.45 \

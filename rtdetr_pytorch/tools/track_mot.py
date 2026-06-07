@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import torch
 
-from src.tracker import HybridMOTTracker, RTDETRDetector
+from src.tracker import ByteTrackXLSTMTracker, HybridMOTTracker, RTDETRDetector
 from src.tracker.box_ops import cxcywh_to_xyxy
 
 
@@ -119,24 +119,45 @@ def main(args):
         color_embedding=not args.disable_color_embedding,
         nms_iou_threshold=args.nms_iou,
     )
-    tracker = HybridMOTTracker(
-        image_size=first.size,
-        device=device,
-        max_age=args.max_age,
-        min_hits=args.min_hits,
-        score_threshold=args.track_score,
-        low_score_threshold=args.low_track_score,
-        lambda_motion=args.lambda_motion,
-        lambda_iou=args.lambda_iou,
-        lambda_app=args.lambda_app,
-        duplicate_iou_threshold=args.duplicate_iou,
-        match_cost_threshold=args.match_cost_threshold,
-        low_match_cost_threshold=args.low_match_cost_threshold,
-        fuse_score=not args.disable_fuse_score,
-        use_neural_motion=(args.enable_neural_motion or bool(args.motion_checkpoint)) and not args.disable_neural_motion,
-        motion_backend=args.motion_backend,
-        motion_checkpoint=args.motion_checkpoint,
-    )
+    use_neural_motion = (args.enable_neural_motion or bool(args.motion_checkpoint)) and not args.disable_neural_motion
+    if args.tracker == "byte_xlstm":
+        tracker = ByteTrackXLSTMTracker(
+            image_size=first.size,
+            device=device,
+            track_thresh=args.track_score,
+            low_thresh=args.low_track_score,
+            new_track_thresh=args.new_track_score,
+            match_thresh=args.match_cost_threshold,
+            second_match_thresh=args.low_match_cost_threshold,
+            track_buffer=args.max_age,
+            min_hits=args.min_hits,
+            nms_duplicate_iou=args.duplicate_iou,
+            lambda_iou=args.lambda_iou,
+            lambda_app=args.lambda_app,
+            fuse_score=not args.disable_fuse_score,
+            use_xlstm=use_neural_motion,
+            motion_backend=args.motion_backend,
+            motion_checkpoint=args.motion_checkpoint,
+        )
+    else:
+        tracker = HybridMOTTracker(
+            image_size=first.size,
+            device=device,
+            max_age=args.max_age,
+            min_hits=args.min_hits,
+            score_threshold=args.track_score,
+            low_score_threshold=args.low_track_score,
+            lambda_motion=args.lambda_motion,
+            lambda_iou=args.lambda_iou,
+            lambda_app=args.lambda_app,
+            duplicate_iou_threshold=args.duplicate_iou,
+            match_cost_threshold=args.match_cost_threshold,
+            low_match_cost_threshold=args.low_match_cost_threshold,
+            fuse_score=not args.disable_fuse_score,
+            use_neural_motion=use_neural_motion,
+            motion_backend=args.motion_backend,
+            motion_checkpoint=args.motion_checkpoint,
+        )
 
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -199,8 +220,10 @@ if __name__ == "__main__":
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--image-size", type=int, default=640)
+    parser.add_argument("--tracker", choices=["byte_xlstm", "hybrid"], default="byte_xlstm")
     parser.add_argument("--det-score", type=float, default=0.10)
     parser.add_argument("--track-score", type=float, default=0.45)
+    parser.add_argument("--new-track-score", type=float, default=None)
     parser.add_argument("--low-track-score", type=float, default=0.10)
     parser.add_argument("--nms-iou", type=float, default=0.60)
     parser.add_argument("--person-label", type=int, default=0)

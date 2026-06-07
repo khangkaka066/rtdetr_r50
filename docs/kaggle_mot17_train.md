@@ -129,6 +129,7 @@ python tools/track_mot.py \
   -r /kaggle/input/models/nguyenvohoangkhang/rtdetr-r50-24epoch/pytorch/default/1/checkpoint.pth \
   --amp \
   --video-output output/MOT17-08-FRCNN.mp4 \
+  --tracker byte_xlstm \
   --image-size 640 \
   --det-score 0.10 \
   --track-score 0.45 \
@@ -148,6 +149,7 @@ python tools/track_mot.py \
   -r /kaggle/input/models/nguyenvohoangkhang/rtdetr-r50-24epoch/pytorch/default/1/checkpoint.pth \
   --amp \
   --vis-dir output/vis/MOT17-08-FRCNN \
+  --tracker byte_xlstm \
   --det-score 0.10 \
   --track-score 0.45 \
   --nms-iou 0.60 \
@@ -203,6 +205,7 @@ python tools/track_mot.py \
   --source /kaggle/input/datasets/wenhoujinjust/mot-17/MOT17/train/MOT17-02-FRCNN \
   -r /kaggle/input/models/nguyenvohoangkhang/rtdetr-r50-24epoch/pytorch/default/1/checkpoint.pth \
   --amp \
+  --tracker byte_xlstm \
   --det-score 0.10 \
   --track-score 0.45 \
   --low-track-score 0.10 \
