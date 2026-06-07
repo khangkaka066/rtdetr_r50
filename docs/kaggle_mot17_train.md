@@ -134,6 +134,9 @@ python tools/track_mot.py \
   --track-score 0.45 \
   --low-track-score 0.10 \
   --nms-iou 0.60 \
+  --duplicate-iou 0.85 \
+  --match-cost-threshold 0.85 \
+  --low-match-cost-threshold 0.70 \
   --output output/MOT17-08-FRCNN.txt
 ```
 

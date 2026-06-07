@@ -55,8 +55,10 @@ class HybridMOTTracker:
         second_stage_min_iou=0.001,
         new_track_iou_threshold=0.45,
         duplicate_iou_threshold=0.85,
+        match_cost_threshold=0.85,
+        low_match_cost_threshold=0.70,
         fuse_score=True,
-        use_neural_motion=True,
+        use_neural_motion=False,
         motion_checkpoint=None,
     ):
         self.width, self.height = image_size
@@ -75,6 +77,8 @@ class HybridMOTTracker:
         self.second_stage_min_iou = float(second_stage_min_iou)
         self.new_track_iou_threshold = float(new_track_iou_threshold)
         self.duplicate_iou_threshold = float(duplicate_iou_threshold)
+        self.match_cost_threshold = float(match_cost_threshold)
+        self.low_match_cost_threshold = float(low_match_cost_threshold)
         self.fuse_score = bool(fuse_score)
         self.tracks = []
         self.next_id = 1
@@ -103,6 +107,7 @@ class HybridMOTTracker:
             high_det_indices,
             min_iou=self.min_iou,
             max_mahalanobis=self.max_mahalanobis,
+            cost_threshold=self.match_cost_threshold,
         )
 
         low_matches, unmatched_tracks, _ = self._match(
@@ -115,6 +120,7 @@ class HybridMOTTracker:
             lambda_motion=0.05,
             lambda_iou=0.90,
             lambda_app=0.05,
+            cost_threshold=self.low_match_cost_threshold,
         )
         matches.extend(low_matches)
 
@@ -164,6 +170,7 @@ class HybridMOTTracker:
         lambda_motion=None,
         lambda_iou=None,
         lambda_app=None,
+        cost_threshold=None,
     ):
         if not track_indices:
             return [], [], list(detection_indices)
@@ -173,6 +180,7 @@ class HybridMOTTracker:
         lambda_motion = self.lambda_motion if lambda_motion is None else float(lambda_motion)
         lambda_iou = self.lambda_iou if lambda_iou is None else float(lambda_iou)
         lambda_app = self.lambda_app if lambda_app is None else float(lambda_app)
+        cost_threshold = self.match_cost_threshold if cost_threshold is None else float(cost_threshold)
 
         cost = np.full((len(track_indices), len(detection_indices)), 1e6, dtype=np.float32)
         for local_i, track_idx in enumerate(track_indices):
@@ -201,7 +209,7 @@ class HybridMOTTracker:
         used_tracks = set()
         used_dets = set()
         for r, c in zip(row_ind, col_ind):
-            if cost[r, c] >= 1e6:
+            if cost[r, c] >= 1e6 or cost[r, c] > cost_threshold:
                 continue
             track_idx = int(track_indices[r])
             det_idx = int(detection_indices[c])

@@ -130,8 +130,10 @@ def main(args):
         lambda_iou=args.lambda_iou,
         lambda_app=args.lambda_app,
         duplicate_iou_threshold=args.duplicate_iou,
+        match_cost_threshold=args.match_cost_threshold,
+        low_match_cost_threshold=args.low_match_cost_threshold,
         fuse_score=not args.disable_fuse_score,
-        use_neural_motion=not args.disable_neural_motion,
+        use_neural_motion=(args.enable_neural_motion or bool(args.motion_checkpoint)) and not args.disable_neural_motion,
         motion_checkpoint=args.motion_checkpoint,
     )
 
@@ -208,7 +210,10 @@ if __name__ == "__main__":
     parser.add_argument("--lambda-iou", type=float, default=0.65)
     parser.add_argument("--lambda-app", type=float, default=0.20)
     parser.add_argument("--duplicate-iou", type=float, default=0.85)
+    parser.add_argument("--match-cost-threshold", type=float, default=0.85)
+    parser.add_argument("--low-match-cost-threshold", type=float, default=0.70)
     parser.add_argument("--motion-checkpoint", default="", help="optional trained xLSTM/LNN residual checkpoint")
+    parser.add_argument("--enable-neural-motion", action="store_true")
     parser.add_argument("--disable-neural-motion", action="store_true")
     parser.add_argument("--disable-color-embedding", action="store_true")
     parser.add_argument("--disable-fuse-score", action="store_true")

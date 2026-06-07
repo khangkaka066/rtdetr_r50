@@ -4,10 +4,8 @@ This repo now includes a runnable tracking pipeline:
 
 ```text
 frame -> RT-DETR detections -> Kalman prediction
-      -> xLSTM residual branch
-      -> LNN residual branch
-      -> fusion gate
-      -> uncertainty-aware Hungarian matching
+      -> ByteTrack-style high/low-score association
+      -> IoU + score-fused + color-appearance Hungarian matching
       -> active tracks in MOT format
 ```
 
@@ -16,6 +14,15 @@ The xLSTM/LNN residual branches are implemented as stateful PyTorch modules
 with zero-initialized residual heads. That means the tracker is safe to run
 without a separate motion checkpoint: it behaves like a Kalman/IoU tracker
 until you train or load residual motion weights.
+
+By default, `tools/track_mot.py` runs the ByteTrack-like path:
+
+```text
+Kalman prediction + IoU matching + detection score fusion + color appearance
+```
+
+The xLSTM/LNN residual motion branch is only enabled when you pass
+`--enable-neural-motion` or `--motion-checkpoint`.
 
 ## Kaggle Run
 
@@ -41,6 +48,9 @@ Run one MOT17 sequence:
   --track-score 0.45 \
   --low-track-score 0.10 \
   --nms-iou 0.60 \
+  --duplicate-iou 0.85 \
+  --match-cost-threshold 0.85 \
+  --low-match-cost-threshold 0.70 \
   --output output/MOT17-08-FRCNN.txt
 ```
 
