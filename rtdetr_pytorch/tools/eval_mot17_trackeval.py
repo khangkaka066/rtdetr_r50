@@ -73,6 +73,18 @@ def run_trackeval(args, gt_folder, trackers_folder, seqmap_file):
         )
 
     sys.path.insert(0, str(trackeval_root))
+    import numpy as np
+
+    # TrackEval still uses deprecated NumPy aliases. Kaggle's current NumPy
+    # removed them, so provide the aliases before importing TrackEval modules.
+    for name, value in {
+        "float": float,
+        "int": int,
+        "bool": bool,
+    }.items():
+        if not hasattr(np, name):
+            setattr(np, name, value)
+
     import trackeval
 
     eval_config = trackeval.Evaluator.get_default_eval_config()
