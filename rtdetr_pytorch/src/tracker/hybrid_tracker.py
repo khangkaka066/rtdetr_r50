@@ -54,6 +54,8 @@ class HybridMOTTracker:
         min_iou=0.02,
         second_stage_min_iou=0.001,
         new_track_iou_threshold=0.45,
+        duplicate_iou_threshold=0.85,
+        fuse_score=True,
         use_neural_motion=True,
         motion_checkpoint=None,
     ):
@@ -72,6 +74,8 @@ class HybridMOTTracker:
         self.min_iou = float(min_iou)
         self.second_stage_min_iou = float(second_stage_min_iou)
         self.new_track_iou_threshold = float(new_track_iou_threshold)
+        self.duplicate_iou_threshold = float(duplicate_iou_threshold)
+        self.fuse_score = bool(fuse_score)
         self.tracks = []
         self.next_id = 1
         self.frame_id = 0
@@ -125,6 +129,7 @@ class HybridMOTTracker:
                 self._start_track(detections[det_idx])
 
         self.tracks = [t for t in self.tracks if t.missing_count <= self.max_age]
+        self.tracks = self._remove_duplicate_tracks(self.tracks)
         return [t for t in self.tracks if t.confirmed]
 
     def _predict_track(self, track, dt):
@@ -187,6 +192,9 @@ class HybridMOTTracker:
                     + lambda_iou * (1.0 - iou)
                     + lambda_app * app_cost
                 )
+                if self.fuse_score:
+                    score = max(float(det.score), 1e-3)
+                    cost[local_i, local_j] = 1.0 - (1.0 - cost[local_i, local_j]) * score
 
         row_ind, col_ind = linear_sum_assignment(cost)
         matches = []
@@ -272,11 +280,36 @@ class HybridMOTTracker:
                 return False
         return True
 
+    def _remove_duplicate_tracks(self, tracks):
+        if len(tracks) <= 1:
+            return tracks
+
+        keep = [True] * len(tracks)
+        for i in range(len(tracks)):
+            if not keep[i]:
+                continue
+            for j in range(i + 1, len(tracks)):
+                if not keep[j]:
+                    continue
+                if iou_cxcywh(tracks[i].bbox, tracks[j].bbox) < self.duplicate_iou_threshold:
+                    continue
+                drop = self._duplicate_drop_index(tracks, i, j)
+                keep[drop] = False
+        return [track for track, should_keep in zip(tracks, keep) if should_keep]
+
+    @staticmethod
+    def _duplicate_drop_index(tracks, i, j):
+        a = tracks[i]
+        b = tracks[j]
+        key_a = (a.confirmed, -a.missing_count, a.hits, a.age, a.score)
+        key_b = (b.confirmed, -b.missing_count, b.hits, b.age, b.score)
+        return j if key_a >= key_b else i
+
     def _history_tensor(self, track):
         items = list(track.history)
         while len(items) < 2:
             items.insert(0, items[0])
-        return torch.tensor(items, dtype=torch.float32, device=self.device).unsqueeze(0)
+        return torch.as_tensor(np.asarray(items, dtype=np.float32), device=self.device).unsqueeze(0)
 
     def _lnn_input(self, track, bbox, dt, is_missing):
         feature = self._feature_vector(

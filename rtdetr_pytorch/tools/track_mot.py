@@ -129,6 +129,8 @@ def main(args):
         lambda_motion=args.lambda_motion,
         lambda_iou=args.lambda_iou,
         lambda_app=args.lambda_app,
+        duplicate_iou_threshold=args.duplicate_iou,
+        fuse_score=not args.disable_fuse_score,
         use_neural_motion=not args.disable_neural_motion,
         motion_checkpoint=args.motion_checkpoint,
     )
@@ -205,9 +207,11 @@ if __name__ == "__main__":
     parser.add_argument("--lambda-motion", type=float, default=0.15)
     parser.add_argument("--lambda-iou", type=float, default=0.65)
     parser.add_argument("--lambda-app", type=float, default=0.20)
+    parser.add_argument("--duplicate-iou", type=float, default=0.85)
     parser.add_argument("--motion-checkpoint", default="", help="optional trained xLSTM/LNN residual checkpoint")
     parser.add_argument("--disable-neural-motion", action="store_true")
     parser.add_argument("--disable-color-embedding", action="store_true")
+    parser.add_argument("--disable-fuse-score", action="store_true")
     parser.add_argument("--write-missing", action="store_true", help="also write predicted boxes for missing tracks")
     parser.add_argument("--show-missing-tracks", action="store_true", help="draw predicted missing tracks in video/frames")
     parser.add_argument("--log-step", type=int, default=50)
