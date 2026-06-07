@@ -53,6 +53,7 @@ class HybridMOTTracker:
         max_mahalanobis=80.0,
         min_iou=0.02,
         second_stage_min_iou=0.001,
+        new_track_iou_threshold=0.45,
         use_neural_motion=True,
         motion_checkpoint=None,
     ):
@@ -70,6 +71,7 @@ class HybridMOTTracker:
         self.max_mahalanobis = float(max_mahalanobis)
         self.min_iou = float(min_iou)
         self.second_stage_min_iou = float(second_stage_min_iou)
+        self.new_track_iou_threshold = float(new_track_iou_threshold)
         self.tracks = []
         self.next_id = 1
         self.frame_id = 0
@@ -119,7 +121,8 @@ class HybridMOTTracker:
             self._update_missing(self.tracks[track_idx], predictions[track_idx], dt)
 
         for det_idx in unmatched_high_detections:
-            self._start_track(detections[det_idx])
+            if self._can_start_track(detections[det_idx]):
+                self._start_track(detections[det_idx])
 
         self.tracks = [t for t in self.tracks if t.missing_count <= self.max_age]
         return [t for t in self.tracks if t.confirmed]
@@ -260,6 +263,14 @@ class HybridMOTTracker:
         )
         self.next_id += 1
         self.tracks.append(track)
+
+    def _can_start_track(self, detection):
+        for track in self.tracks:
+            if track.missing_count > 0:
+                continue
+            if iou_cxcywh(track.bbox, detection.bbox) >= self.new_track_iou_threshold:
+                return False
+        return True
 
     def _history_tensor(self, track):
         items = list(track.history)

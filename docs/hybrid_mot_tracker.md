@@ -40,6 +40,7 @@ Run one MOT17 sequence:
   --det-score 0.10 \
   --track-score 0.45 \
   --low-track-score 0.10 \
+  --nms-iou 0.60 \
   --output output/MOT17-08-FRCNN.txt
 ```
 
@@ -53,6 +54,7 @@ Add visualization frames:
   --vis-dir output/vis/MOT17-08-FRCNN \
   --det-score 0.10 \
   --track-score 0.45 \
+  --nms-iou 0.60 \
   --output output/MOT17-08-FRCNN.txt
 ```
 
@@ -80,5 +82,7 @@ FileLink("/kaggle/working/rtdetr_r50/rtdetr_pytorch/output/MOT17-08-FRCNN.mp4")
 
 - `--image-size 800` can improve small-person recall but costs more VRAM.
 - Use `--det-score 0.10` with `--track-score 0.45` to keep low-confidence detections for association without creating too many new tracks.
+- `--nms-iou 0.60` removes duplicated RT-DETR queries before tracking.
+- Missing predicted tracks are not drawn by default. Add `--show-missing-tracks` only when debugging occlusion.
 - `--motion-checkpoint path.pth` can load trained xLSTM/LNN residual weights.
 - `--disable-neural-motion` runs only Kalman + IoU matching.

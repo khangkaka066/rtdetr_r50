@@ -9,7 +9,7 @@ from PIL import Image
 
 from src.core import YAMLConfig
 
-from .box_ops import xyxy_to_cxcywh
+from .box_ops import iou_cxcywh, xyxy_to_cxcywh
 from .hybrid_tracker import Detection
 
 
@@ -33,6 +33,7 @@ class RTDETRDetector:
     person_label: int | None = 0
     amp: bool = True
     color_embedding: bool = True
+    nms_iou_threshold: float = 0.60
 
     def __post_init__(self):
         if self.device == "cuda" and not torch.cuda.is_available():
@@ -84,7 +85,22 @@ class RTDETRDetector:
                     embedding=embedding,
                 )
             )
-        return detections
+        return self._nms(detections)
+
+    def _nms(self, detections):
+        if self.nms_iou_threshold <= 0 or len(detections) <= 1:
+            return detections
+        kept = []
+        by_score = sorted(detections, key=lambda det: det.score, reverse=True)
+        for det in by_score:
+            duplicate = False
+            for kept_det in kept:
+                if det.label == kept_det.label and iou_cxcywh(det.bbox, kept_det.bbox) >= self.nms_iou_threshold:
+                    duplicate = True
+                    break
+            if not duplicate:
+                kept.append(det)
+        return kept
 
     @staticmethod
     def _color_embedding(image, xyxy, bins=8):

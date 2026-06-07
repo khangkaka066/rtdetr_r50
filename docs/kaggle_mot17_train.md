@@ -133,6 +133,7 @@ python tools/track_mot.py \
   --det-score 0.10 \
   --track-score 0.45 \
   --low-track-score 0.10 \
+  --nms-iou 0.60 \
   --output output/MOT17-08-FRCNN.txt
 ```
 
@@ -146,6 +147,7 @@ python tools/track_mot.py \
   --vis-dir output/vis/MOT17-08-FRCNN \
   --det-score 0.10 \
   --track-score 0.45 \
+  --nms-iou 0.60 \
   --output output/MOT17-08-FRCNN.txt
 ```
 

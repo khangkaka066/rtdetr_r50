@@ -31,11 +31,13 @@ def list_frames(source):
     return sorted(frames)
 
 
-def draw_tracks(image, tracks):
+def draw_tracks(image, tracks, show_missing=False):
     image = image.copy()
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default()
     for track in tracks:
+        if track.is_missing and not show_missing:
+            continue
         x1, y1, x2, y2 = cxcywh_to_xyxy(track.bbox)
         color = "lime" if not track.is_missing else "yellow"
         draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
@@ -114,6 +116,7 @@ def main(args):
         person_label=None if args.all_classes else args.person_label,
         amp=args.amp,
         color_embedding=not args.disable_color_embedding,
+        nms_iou_threshold=args.nms_iou,
     )
     tracker = HybridMOTTracker(
         image_size=first.size,
@@ -157,7 +160,7 @@ def main(args):
 
                 annotated = None
                 if vis_dir or args.video_output:
-                    annotated = draw_tracks(image, tracks)
+                    annotated = draw_tracks(image, tracks, show_missing=args.show_missing_tracks)
                 if vis_dir:
                     annotated.save(vis_dir / frame_path.name)
                 if args.video_output:
@@ -188,6 +191,7 @@ if __name__ == "__main__":
     parser.add_argument("--det-score", type=float, default=0.10)
     parser.add_argument("--track-score", type=float, default=0.45)
     parser.add_argument("--low-track-score", type=float, default=0.10)
+    parser.add_argument("--nms-iou", type=float, default=0.60)
     parser.add_argument("--person-label", type=int, default=0)
     parser.add_argument("--all-classes", action="store_true")
     parser.add_argument("--max-age", type=int, default=30)
@@ -199,5 +203,6 @@ if __name__ == "__main__":
     parser.add_argument("--disable-neural-motion", action="store_true")
     parser.add_argument("--disable-color-embedding", action="store_true")
     parser.add_argument("--write-missing", action="store_true", help="also write predicted boxes for missing tracks")
+    parser.add_argument("--show-missing-tracks", action="store_true", help="draw predicted missing tracks in video/frames")
     parser.add_argument("--log-step", type=int, default=50)
     main(parser.parse_args())
